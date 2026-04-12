@@ -20,13 +20,22 @@ st.title("🦠 COVID-19 Trend Analysis & Forecasting")
 # ---------------------------
 @st.cache_data
 def load_data():
-    url = "https://covid.ourworldindata.org/data/owid-covid-data.csv"
-    df = pd.read_csv(url, usecols=[
-        'continent', 'location', 'date', 'iso_code', 'population',
-        'total_cases', 'new_cases_smoothed',
-        'total_deaths', 'new_deaths_smoothed',
-        'total_vaccinations', 'people_fully_vaccinated_per_hundred'
-    ])
+    # Use the official GitHub raw link, which is much more stable for cloud apps
+    url = "https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv"
+    
+    # Add a User-Agent so the server doesn't block Streamlit as a bot
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    
+    df = pd.read_csv(
+        url, 
+        storage_options=headers, # This bypasses the security block
+        usecols=[
+            'continent', 'location', 'date', 'iso_code', 'population',
+            'total_cases', 'new_cases_smoothed',
+            'total_deaths', 'new_deaths_smoothed',
+            'total_vaccinations', 'people_fully_vaccinated_per_hundred'
+        ]
+    )
     df['date'] = pd.to_datetime(df['date'])
     # Filter out aggregate regions (like 'World', 'Asia', 'High income')
     df = df[df['continent'].notna()]

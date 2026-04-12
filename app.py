@@ -16,18 +16,17 @@ st.title("🦠 COVID-19 Trend Analysis Dashboard")
 @st.cache_data
 def load_data():
     url = "https://covid.ourworldindata.org/data/owid-covid-data.csv"
-
     df = pd.read_csv(url, usecols=[
         'date','location','iso_code',
         'total_cases','new_cases_smoothed',
         'total_deaths','new_deaths_smoothed',
         'total_vaccinations'
     ])
-
     df['date'] = pd.to_datetime(df['date'])
     return df
 
-df = load_data()
+with st.spinner("Loading COVID-19 Data..."):
+    df = load_data()
 
 # ---------------------------
 # SIDEBAR FILTERS
@@ -46,6 +45,11 @@ date_range = st.sidebar.date_input(
     min_value=min_date,
     max_value=max_date
 )
+
+# BUG FIX: Ensure the user has selected both start and end dates
+if len(date_range) != 2:
+    st.warning("Please select an end date.")
+    st.stop()
 
 filtered_df = df[
     (df['location'] == selected_country) &
@@ -67,9 +71,14 @@ st.subheader(f"📊 {selected_country} Overview")
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Total Cases", int(filtered_df['total_cases'].iloc[-1]))
-col2.metric("Total Deaths", int(filtered_df['total_deaths'].fillna(0).iloc[-1]))
-col3.metric("Total Vaccinations", int(filtered_df['total_vaccinations'].fillna(0).iloc[-1]))
+# Improved formatting with commas for readability
+total_cases = int(filtered_df['total_cases'].iloc[-1])
+total_deaths = int(filtered_df['total_deaths'].fillna(0).iloc[-1])
+total_vax = int(filtered_df['total_vaccinations'].fillna(0).iloc[-1])
+
+col1.metric("Total Cases", f"{total_cases:,}")
+col2.metric("Total Deaths", f"{total_deaths:,}")
+col3.metric("Total Vaccinations", f"{total_vax:,}")
 
 # ---------------------------
 # CASES TREND
@@ -111,7 +120,8 @@ st.plotly_chart(fig_vacc, use_container_width=True)
 # ---------------------------
 st.subheader("🌍 Global COVID-19 Spread")
 
-latest = df[df['date'] == df['date'].max()]
+# BUG FIX: Get the maximum total cases reported for each country, avoiding missing recent dates
+latest = df.groupby(['iso_code', 'location'], as_index=False)['total_cases'].max()
 
 fig_map = px.choropleth(
     latest,
@@ -146,7 +156,7 @@ fig_compare = px.line(
 st.plotly_chart(fig_compare, use_container_width=True)
 
 # ---------------------------
-# MACHINE LEARNING FORECAST (IMPROVED)
+# MACHINE LEARNING FORECAST
 # ---------------------------
 st.subheader("🔮 30-Day Prediction")
 
@@ -158,21 +168,24 @@ if len(forecast_df) > 10:
     X = forecast_df[['days']]
     y = forecast_df['new_cases_smoothed']
 
+    # Note: Consider swapping LinearRegression for a more complex time-series model in the future
     model = LinearRegression()
     model.fit(X, y)
 
     future_days = np.arange(X.max()[0], X.max()[0] + 30).reshape(-1, 1)
-    future_preds = model.predict(future_days)
+    
+    # Ensure no negative predictions are plotted
+    future_preds = np.maximum(0, model.predict(future_days)) 
 
     future_dates = pd.date_range(filtered_df['date'].max(), periods=30)
 
-    fig_pred = px.line(title="Forecast vs Actual")
+    fig_pred = px.line(title="Forecast vs Actual (Linear Trend)")
     fig_pred.add_scatter(x=forecast_df['date'], y=y, name="Actual")
-    fig_pred.add_scatter(x=future_dates, y=future_preds, name="Prediction")
+    fig_pred.add_scatter(x=future_dates, y=future_preds, name="Prediction", line=dict(dash='dash'))
 
     st.plotly_chart(fig_pred, use_container_width=True)
 else:
-    st.info("Not enough data for prediction.")
+    st.info("Not enough data points for a reliable prediction.")
 
 # ---------------------------
 # FOOTER

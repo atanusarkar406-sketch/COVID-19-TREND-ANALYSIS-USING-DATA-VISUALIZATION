@@ -198,4 +198,4 @@ with tab3:
 # FOOTER
 # ---------------------------
 st.markdown("---")
-st.caption("Data Source: Our World in Data | Developed for AI Project")
+st.caption("Data Source: Our World in Data | Developed for Basic AI Tools & Applications Project")
